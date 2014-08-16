@@ -1,0 +1,166 @@
+---
+output: html_document
+---
+
+###Assignment1  
+**This is a R Markdown document for the Peer Assignment1.The explanation for each task are presented before the code chunks.** 
+    
+   
+####Setting Global options for Code chunks  
+    
+```{r SetOptions, echo=TRUE}
+   library(knitr)  
+   opts_chunk$set(echo=TRUE)
+```
+
+####Reading data to R  
+  In this section we load data to R and change type of the **date** column into a proper format.  
+     
+```{r Read&Process}
+   raw_data<-read.csv('activity.csv',sep=",",na.strings="NA")
+   prcs_data<-transform(raw_data,date=as.Date(as.character(date),format="%Y-%m-%d"))
+```
+
+####The mean total number of steps taken per day   
+- First we retrieve the data from the processed data and we need to ignore the NA values here.  
+```{r }
+aggr1<-aggregate(prcs_data[!is.na(prcs_data$steps),c('steps')],by=list(days=prcs_data[!is.na(prcs_data$steps),                          c('date')]),FUN=sum)
+
+```
+- Second we use the ggplot2 system to plot the histogram  
+```{r }
+   library(ggplot2)
+   p1<-ggplot(aggr1, aes(x =days , y = x)) 
+   p1<-p1+geom_bar(stat = "identity")
+   p1<-p1+ggtitle('The total number of steps taken each day')
+   update_labels(p1, list(x="Days",y="Total number of steps"))
+```
+
+**The mean and median total number of steps taken per day**
+```{r }
+  mn1<-mean(aggr1$x)
+  md1<-median(aggr1$x)
+```
+- The mean total number of steps taken per day is **`r mn1`**   
+- The median total number of steps taken per day is **`r md1`**    
+
+####The average daily activity pattern      
+  
+- First we retrieve the data from the processed data and we need to ignore the NA values    
+```{r }
+aggr2<-aggregate(prcs_data[!is.na(prcs_data$steps) & !is.na(prcs_data$interval),c('steps')],
+                 by=list(intervals=prcs_data[!is.na(prcs_data$steps) & !is.na(prcs_data$interval),
+                 c('interval')]),FUN=mean)
+```
+- Second we plot time series of 5-minute interval    
+```{r }
+   library(ggplot2)
+   p2<-ggplot(aggr2, aes(x =intervals , y = x)) 
+   p2<-p2+geom_line(stat = "identity")
+   p2<-p2+ggtitle('The average daily activity pattern')
+   update_labels(p2, list(x="Intervals",y="Average number of steps"))
+```
+
+**The 5-minute interval with the maximum number of steps**  
+
+```{r }
+mx<-aggr2[aggr2$x==max(aggr2$x),c('intervals')]
+```
+
+The **`r mx`th** interval  contains the maximum number of steps on average all the days in data set.  
+
+####Imputing missing values
+
+```{r }
+rows_na<-prcs_data[is.na(prcs_data$steps) | is.na(prcs_data$date) | is.na(prcs_data$interval),  ]
+Total<-nrow(rows_na)
+```
+The total number of rows with NAs is **`r Total`**   
+
+- We used the mean for each 5-minute interval to fill NAs and to create prcs_data_no_NA dataset without NAs
+
+```{r}
+prcs_data_no_NA<-prcs_data
+
+for (i in 1: nrow(aggr2)) {
+  
+  temp_mean<-aggr2[i,2]
+  temp_interval<-aggr2[i,c('intervals')]
+  for(j in 1:nrow(prcs_data_no_NA)){
+    
+       if(is.na(prcs_data_no_NA[j,c('steps')]) & (prcs_data_no_NA[j,c('interval')]==temp_interval))
+       prcs_data_no_NA[j,c('steps')]<-temp_mean
+  }
+}
+
+```
+
+#### The impact of imputing missing data on the estimates of the total daily number of steps  
+
+- First retrieve  the proper data from prcs_data_no_NA to plot  
+```{r }
+
+   aggr4<-aggregate(prcs_data_no_NA[,c('steps')],
+                    by=list(days=prcs_data_no_NA[,c('date')]),FUN=sum)
+
+```
+
+- Second use the ggplot2 system to plot the histogram  
+```{r}
+   library(ggplot2)
+   p3<-ggplot(aggr4, aes(x =days , y = x)) 
+   p3<-p3+geom_bar(stat = "identity")
+   p3<-p3+ggtitle('The total number of steps taken each day-No missing value')
+   update_labels(p3, list(x="Days",y="Total number of steps"))
+```
+
+**The mean and median total number of steps taken per day**
+
+```{r }
+   mn3<-mean(aggr4$x)
+   md2<-median(aggr4$x)
+if (mn3<mn1) 
+{  word1<-'smaller than'
+}else {if(mn3>mn1)
+  {word1<-'bigger than'
+  
+}else
+  word1<-'equal with'}
+
+if (md2<md1)
+{ word2<-'smaller than'
+}else{if (md2>md1)
+  {word2<-'bigger than'
+}else
+  word2<-'equal with'}
+
+```
+**The mean total number of steps taken per day is `r mn3` and is `r word1`  the previous mean **    
+**The median total number of steps taken per day is `r md2 `and is `r word2`  the previous median**  
+**On the whole no significant change has been seen on the estimates of the total number of steps in comparison with the case that we did not handle the NAs**
+
+
+#### The differences in activity patterns between weekdays and weekends
+
+- First we create a new factor variable in the dataset with two levels - "weekday" and "weekend" 
+
+```{r}
+prcs_data_no_NA$day_Type <-as.factor(ifelse((weekdays(prcs_data_no_NA$date,T) %in% c('Sat','Sun')),'weekend','weekday'))
+```
+
+- Second we retrieve  the proper data from prcs_data_no_NA to plot
+```{r}
+   aggr5<-aggregate(prcs_data_no_NA[,c('steps')],by=list(intervals=prcs_data_no_NA[,c('interval')],
+                                                         day_type=prcs_data_no_NA[,c('day_Type')]),FUN=mean)
+```
+
+- Third we use the ggplot2 system to plot 
+```{r}
+   library(ggplot2)
+   p5<-ggplot(aggr5[!is.na(aggr5$x),], aes(x =intervals , y = x)) 
+   p5<-p5+geom_line(colour='blue')+coord_cartesian(ylim = c(-5, 245))
+   p5<-p5+facet_grid(.~ day_type ,scales='free',space='free') 
+   p5<-p5+ggtitle(' The average number of steps taken')
+   update_labels(p5, list(x="Intervals",y="Total number of steps"))
+      
+```
